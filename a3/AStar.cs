@@ -8,10 +8,12 @@ public class AStar
 {
     private float[,] traversabilityMatrix;
     private readonly int[,] mOffset = new int[,]{{1,0},{-1,0},{0,1},{0,-1}};
+    private HighResMap mHighResMap;
 
-    public AStar(float[,] traversabilityMatrix)
+    public AStar(ref HighResMap highResMap)
     {
-        this.traversabilityMatrix = traversabilityMatrix;
+        mHighResMap = highResMap;
+        traversabilityMatrix = mHighResMap.traversability;
     }
 
     public List<Tuple<int,int>> ComputePath(int iStart, int jStart, int iEnd, int jEnd)
