@@ -62,7 +62,7 @@ public class GameManager : MonoBehaviour {
 
             goal_sphere.transform.localScale = Vector3.one * 3f;  
             goal_sphere.GetComponent<Renderer>().material.SetColor("_Color", my_color);
-
+            goal_sphere.GetComponent<Collider>().enabled=false;
             // Assign goal point
             if(new_car.tag == "Car")
             {
