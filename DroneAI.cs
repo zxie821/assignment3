@@ -25,6 +25,7 @@ public class DroneAI : MonoBehaviour
     private DroneDecision mDecision;
     private UpScaledMap uMap;
     private bool ifMoveable;
+    private bool ifFinished;
     private int myIndex;
     private void Start()
     {
@@ -72,15 +73,17 @@ public class DroneAI : MonoBehaviour
         pathIndex = 0;
         ownership = 2;
         ifMoveable=false;
+        ifFinished = false;
         targetPosition = tPathV3[pathIndex];
     }
     private void FixedUpdate()
     {
         if (ifMoveable)
         {
-            if (Vector3.Distance(m_Drone.transform.position, my_goal_object.transform.position)<3f)
+            if (Vector3.Distance(m_Drone.transform.position, my_goal_object.transform.position)<5f)
             {
                 occupancyMap.releasePermission(myIndex);
+                ifFinished = true;
                 ifMoveable = false;
             }
             else
@@ -89,7 +92,7 @@ public class DroneAI : MonoBehaviour
                 return;
             }
         }
-        else if(!ifMoveable && Vector3.Distance(m_Drone.transform.position, my_goal_object.transform.position)>10f)
+        else if(!ifMoveable && !ifFinished)
         {
             ifMoveable = occupancyMap.getPermission(myIndex);
             if (ifMoveable)
@@ -97,7 +100,12 @@ public class DroneAI : MonoBehaviour
                 m_Drone.Move_vect(mDecision.getMove());
                 return;
             }
+        }else if(ifFinished)
+        {
+            m_Drone.Move_vect(my_goal_object.transform.position-m_Drone.transform.position);
+            return;
         }
+
         m_Drone.Move_vect(Vector3.zero);
     }
 

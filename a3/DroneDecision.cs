@@ -10,8 +10,8 @@ public class DroneDecision
     List<Vector3> mPath = new List<Vector3>();
     List<Tuple<int,int>> mPathII = new List<Tuple<int, int>>();
     int[] visit_list;
-    float higher_limit=15f;
-    float lower_limit=12f;
+    float higher_limit=20f;
+    float lower_limit=5f;
     float stuckTime = 0f;
     private OccupancyMap occupancyMap;
     private int mCurrentTargetIndex;
@@ -60,7 +60,7 @@ public class DroneDecision
         Vector3 current_speed_orth_target_direct = speed_vector - current_speed_target_direct;
 
         Vector3 update_acceleration;
-        if(speed_vector.magnitude>speed_limit)
+        if(speed_vector.magnitude>speed_limit || !tryAhead())
         {
             update_acceleration = speed_vector*-1;
         }
@@ -104,12 +104,12 @@ public class DroneDecision
     private float getSpeedLimit(Vector3 target_point, float steer_angle, float remote_steer_angle)
     {
         float angle_diff = Math.Abs(remote_steer_angle-steer_angle);
-        if (Vector3.Distance(target_point, mCurrentPosition)<5f)
-        {
-            return lower_limit/3;
-        }
+        // if (Vector3.Distance(target_point, mCurrentPosition)<2f)
+        // {
+        //     return lower_limit/5;
+        // }
         // 即将转弯
-        if( angle_diff>20f)
+        if( angle_diff>10f)
             return lower_limit;
         // 长直线路径
         return higher_limit;
@@ -120,7 +120,8 @@ public class DroneDecision
         for (int i = 0; i < mFriends.Length; i++)
         {
             if ((mFriends[i].transform != mDrone.transform)&&
-            (Vector3.Distance(mFriends[i].transform.position, mDrone.transform.position)<20f))
+            (Vector3.Distance(mFriends[i].transform.position, mDrone.transform.position)<30f)&&
+            occupancyMap.playerStatus[i])
             {
                 counter++;
             }
@@ -143,17 +144,10 @@ public class DroneDecision
     private void updateTargetIndex()
     {
         var targetDistance = Vector3.Distance(mPath[mCurrentTargetIndex],mCurrentPosition);
-        if (true||targetDistance>15f)
+        if (targetDistance<4f)
         {
             searchClosestTargetIndex();
-            targetDistance = Vector3.Distance(mPath[mCurrentTargetIndex],mCurrentPosition);
-        }
-        if(targetDistance<8f)
-        {
-            if (mCurrentTargetIndex<mPath.Count-1 && tryAhead())
-            {
-                mCurrentTargetIndex++;
-            }
+            mCurrentTargetIndex++;
         }
 
     }
@@ -204,8 +198,9 @@ public class DroneDecision
         Vector3 newSpeed = rawAcceleration*Time.fixedDeltaTime + mDrone.velocity;
         foreach (var friend in mFriends)
         {
+            Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
             Vector3 friendLocation = friend.transform.position - mDrone.transform.position;
-            if (Vector3.Dot(friendLocation.normalized, newSpeed.normalized) > 0.5f && friendLocation.magnitude<7f)
+            if (Vector3.Dot(friendLocation.normalized, newSpeed.normalized) > 0.5f && friendLocation.magnitude<5f)
             {
                 Vector3 leftRepulsive = Vector3.Cross(friendLocation, Vector3.down).normalized;
                 repulsiveForce -= (friendLocation.normalized+0f*leftRepulsive.normalized).normalized;

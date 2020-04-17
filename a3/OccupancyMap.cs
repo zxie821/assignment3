@@ -13,10 +13,10 @@ public class OccupancyMap{
     private bool solved = false;
     private GameObject[] mFriends;
     private int[,] mOccupyMap;
-    private float cdTime = 2f;
+    private float cdTime = 0.5f;
     private float[,] coldDownMap;
     private int maxRunningAgent=20;
-    private bool[] playerStatus;
+    public bool[] playerStatus;
     private TerrainInfo mInfo;
     public static OccupancyMap Instance{
         get{
@@ -161,17 +161,6 @@ public class OccupancyMap{
     }
     
     public bool occupyCell(int i, int j, int iEnd, int jEnd,int iEndNext, int jEndNext, Vector3 myPosition){
-        // if(mOccupyMap[iEnd, jEnd]==0)
-        // {
-        //     lock (padlock)
-        //     {
-        //         if (mOccupyMap[iEnd, jEnd]==0)
-        //         {
-        //             return occupy(iEnd, jEnd, getLabel(i,j,iEnd,jEnd, iEndNext, jEndNext));
-        //         }   
-        //     }
-        // }
-        // else 
         if (numOfFriend(iEnd, jEnd, myPosition)==0)
         {
             lock (padlock)
