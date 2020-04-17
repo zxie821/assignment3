@@ -15,6 +15,8 @@ public class OccupancyMap{
     private int[,] mOccupyMap;
     private float cdTime = 2f;
     private float[,] coldDownMap;
+    private int maxRunningAgent=20;
+    private bool[] playerStatus;
     private TerrainInfo mInfo;
     public static OccupancyMap Instance{
         get{
@@ -41,23 +43,26 @@ public class OccupancyMap{
                 mInfo = mTerrainManager.myInfo;
                 mHighResMap = hResMap;
                 mFriends = friends;
+                playerStatus=new bool[100];
                 initOccupyMap();
                 solved = true;
             }
         }
     }
-    private int numOfFriend(int i, int j)
+    private int numOfFriend(int i, int j, Vector3 myPosition)
     {
         int counter=0;
-        foreach (var friend in mFriends)
+        for (int idx = 0; idx < mFriends.Length; idx++)
         {
+            var friend = mFriends[idx];
             var friendLocation = friend.transform.position;
             friendLocation.y = 0;
             if(i==mHighResMap.get_i_index(friendLocation.x) &&
-                j==mHighResMap.get_j_index(friendLocation.z))
+                j==mHighResMap.get_j_index(friendLocation.z) &&
+                playerStatus[idx])
             {
                 counter++;
-            }
+            } 
         }
         return counter;
     }
@@ -70,6 +75,30 @@ public class OccupancyMap{
             return true;  // occupy successfully
         }
         return false;
+    }
+    public bool getPermission(int playerIndex)
+    {
+        lock(padlock){
+            if (maxRunningAgent>0)
+            {
+                if (UnityEngine.Random.Range(0f,1f)>0.5f)
+                {
+                    return false;
+                }
+                maxRunningAgent--;
+                playerStatus[playerIndex] = true;
+                return true;
+            }
+            return false;
+        }
+    }
+    public void releasePermission(int playerIndex)
+    {
+        lock (padlock)
+        {
+            playerStatus[playerIndex] = false;
+            maxRunningAgent++;
+        }
     }
     private int getLabel(int i, int j, int iEnd, int jEnd)
     {
@@ -131,7 +160,7 @@ public class OccupancyMap{
         return 0;
     }
     
-    public bool occupyCell(int i, int j, int iEnd, int jEnd,int iEndNext, int jEndNext){
+    public bool occupyCell(int i, int j, int iEnd, int jEnd,int iEndNext, int jEndNext, Vector3 myPosition){
         // if(mOccupyMap[iEnd, jEnd]==0)
         // {
         //     lock (padlock)
@@ -143,11 +172,11 @@ public class OccupancyMap{
         //     }
         // }
         // else 
-        if (numOfFriend(iEnd, jEnd)==0)
+        if (numOfFriend(iEnd, jEnd, myPosition)==0)
         {
             lock (padlock)
             {
-                if (numOfFriend(iEnd, jEnd)==0)
+                if (numOfFriend(iEnd, jEnd, myPosition)==0)
                 {
                     return occupy(iEnd, jEnd, getLabel(i,j,iEnd,jEnd, iEndNext, jEndNext));
                 }
@@ -156,7 +185,7 @@ public class OccupancyMap{
         return false;  // failed
     }
 
-    public bool occupyCell(Vector3 node, List<Tuple<int,int>> mPathII)
+    public bool occupyCell(Vector3 node, List<Tuple<int,int>> mPathII, Vector3 myPosition)
     {
         var i1 = mHighResMap.get_i_index(node.x);
         var j1 = mHighResMap.get_j_index(node.z);
@@ -186,7 +215,7 @@ public class OccupancyMap{
             i3 = mPathII[originalIndex+2].Item1;
             j3 = mPathII[originalIndex+2].Item2;
         }
-        return occupyCell(i1,j1,i2,j2,i3,j3);
+        return occupyCell(i1,j1,i2,j2,i3,j3, myPosition);
     }
     public int checkOccupancy(Vector3 node, List<Tuple<int,int>> mPathII)
     {

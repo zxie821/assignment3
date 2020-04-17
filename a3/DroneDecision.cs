@@ -127,11 +127,11 @@ public class DroneDecision
         }
         if (counter==0)
         {
-            Debug.Log("no one is around");
+            //Debug.Log("no one is around");
             return true;
         }
         int nextStatus = occupancyMap.checkOccupancy(mPath[mCurrentTargetIndex], mPathII);
-        if (nextStatus==0 && occupancyMap.occupyCell(mPath[mCurrentTargetIndex], mPathII))
+        if (nextStatus==0 && occupancyMap.occupyCell(mPath[mCurrentTargetIndex], mPathII, mCurrentPosition))
         {
             return true;
         }else if(nextStatus!=0)
@@ -143,11 +143,12 @@ public class DroneDecision
     private void updateTargetIndex()
     {
         var targetDistance = Vector3.Distance(mPath[mCurrentTargetIndex],mCurrentPosition);
-        if (targetDistance>15f)
+        if (true||targetDistance>15f)
         {
             searchClosestTargetIndex();
+            targetDistance = Vector3.Distance(mPath[mCurrentTargetIndex],mCurrentPosition);
         }
-        else if(targetDistance<5f)
+        if(targetDistance<8f)
         {
             if (mCurrentTargetIndex<mPath.Count-1 && tryAhead())
             {
@@ -204,7 +205,7 @@ public class DroneDecision
         foreach (var friend in mFriends)
         {
             Vector3 friendLocation = friend.transform.position - mDrone.transform.position;
-            if (Vector3.Dot(friendLocation.normalized, newSpeed.normalized) > 0.5f && friendLocation.magnitude<8f)
+            if (Vector3.Dot(friendLocation.normalized, newSpeed.normalized) > 0.5f && friendLocation.magnitude<7f)
             {
                 Vector3 leftRepulsive = Vector3.Cross(friendLocation, Vector3.down).normalized;
                 repulsiveForce -= (friendLocation.normalized+0f*leftRepulsive.normalized).normalized;

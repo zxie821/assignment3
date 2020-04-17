@@ -24,11 +24,22 @@ public class DroneAI : MonoBehaviour
     public GameObject[] friends; // use these to avoid collisions
     private DroneDecision mDecision;
     private UpScaledMap uMap;
+    private bool ifMoveable;
+    private int myIndex;
     private void Start()
     {
         // get the drone controller
         m_Drone = GetComponent<DroneController>();
         friends = GameObject.FindGameObjectsWithTag("Drone");
+        myIndex = -1;
+        for (int idx = 0; idx < friends.Length; idx++)
+        {
+            if (friends[idx].transform == m_Drone.transform)
+            {
+                myIndex = idx;
+                break;
+            }
+        }
         terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
         tInfo = terrain_manager.myInfo;
         Vector3 start_pos = m_Drone.transform.position;
@@ -60,11 +71,34 @@ public class DroneAI : MonoBehaviour
         //status init
         pathIndex = 0;
         ownership = 2;
+        ifMoveable=false;
         targetPosition = tPathV3[pathIndex];
     }
     private void FixedUpdate()
     {
-        m_Drone.Move_vect(mDecision.getMove());
+        if (ifMoveable)
+        {
+            if (Vector3.Distance(m_Drone.transform.position, my_goal_object.transform.position)<3f)
+            {
+                occupancyMap.releasePermission(myIndex);
+                ifMoveable = false;
+            }
+            else
+            {
+                m_Drone.Move_vect(mDecision.getMove());    
+                return;
+            }
+        }
+        else if(!ifMoveable && Vector3.Distance(m_Drone.transform.position, my_goal_object.transform.position)>10f)
+        {
+            ifMoveable = occupancyMap.getPermission(myIndex);
+            if (ifMoveable)
+            {
+                m_Drone.Move_vect(mDecision.getMove());
+                return;
+            }
+        }
+        m_Drone.Move_vect(Vector3.zero);
     }
 
     // Update is called once per frame
