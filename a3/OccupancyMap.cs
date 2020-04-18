@@ -13,9 +13,9 @@ public class OccupancyMap{
     private bool solved = false;
     private GameObject[] mFriends;
     private int[,] mOccupyMap;
-    private float cdTime = 0.5f;
+    private float cdTime = 1f;
     private float[,] coldDownMap;
-    private int maxRunningAgent=20;
+    private int maxRunningAgent=50;
     public bool[] playerStatus;
     private TerrainInfo mInfo;
     public static OccupancyMap Instance{
