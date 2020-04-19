@@ -2,92 +2,96 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-
+using Panda;
 
 //namespace UnityStandardAssets.Vehicles.Car
 //{
-    [RequireComponent(typeof(DroneController))]
-    public class DroneAISoccer_blue : MonoBehaviour
+[RequireComponent(typeof(DroneController))]
+public class DroneAISoccer_blue : MonoBehaviour
+{
+    private DroneController m_Drone; // the drone controller we want to use
+
+    public GameObject terrain_manager_game_object;
+    TerrainManager terrain_manager;
+
+    public GameObject[] friends;
+    public string friend_tag;
+    public GameObject[] enemies;
+    public string enemy_tag;
+
+    public GameObject own_goal;
+    public GameObject other_goal;
+    public GameObject ball;
+    public PandaBehaviour pbTree;
+    public int playerNum;
+    public int counter;
+    public Vector3 otherGoal,ownGoal;
+    public Vector3 myPosition,ballPosition,ballVelocity, ballPositionPredict;
+    public Vector3 defendPoint1, defendPoint2, myDefencePoint;
+    public List<Vector3> possibleAcceleration;
+    private void Start()
     {
-        private DroneController m_Drone; // the drone controller we want to use
+        // get the car controller
+        m_Drone = GetComponent<DroneController>();
+        terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
+        //pbTree =  GetComponent<PandaBehaviour>();
 
-        public GameObject terrain_manager_game_object;
-        TerrainManager terrain_manager;
+        // note that both arrays will have holes when objects are destroyed
+        // but for initial planning they should work
+        friend_tag = gameObject.tag;
+        if (friend_tag == "Blue")
+            enemy_tag = "Red";
+        else
+            enemy_tag = "Blue";
 
-        public GameObject[] friends;
-        public string friend_tag;
-        public GameObject[] enemies;
-        public string enemy_tag;
+        friends = GameObject.FindGameObjectsWithTag(friend_tag);
+        enemies = GameObject.FindGameObjectsWithTag(enemy_tag);
 
-        public GameObject own_goal;
-        public GameObject other_goal;
-        public GameObject ball;
-
-
-        private void Start()
+        initAcc();
+        ball = GameObject.FindGameObjectWithTag("Ball");
+        defendPoint1 = new Vector3(150f, 0f,110f);
+        defendPoint2 = new Vector3(130f, 0f, 90f);
+        for (playerNum = 0; friends[playerNum].transform != m_Drone.transform; playerNum++){}
+        myDefencePoint = defendPoint2;
+        if (playerNum==1)
         {
-            // get the car controller
-            m_Drone = GetComponent<DroneController>();
-            terrain_manager = terrain_manager_game_object.GetComponent<TerrainManager>();
-
-
-            // note that both arrays will have holes when objects are destroyed
-            // but for initial planning they should work
-            friend_tag = gameObject.tag;
-            if (friend_tag == "Blue")
-                enemy_tag = "Red";
-            else
-                enemy_tag = "Blue";
-
-            friends = GameObject.FindGameObjectsWithTag(friend_tag);
-            enemies = GameObject.FindGameObjectsWithTag(enemy_tag);
-
-            ball = GameObject.FindGameObjectWithTag("Ball");
-
-
-            // Plan your path here
-            // ...
+            myDefencePoint = defendPoint1;
         }
-
-
-        private void FixedUpdate()
+        FixedUpdate();
+    }
+    
+    private void initAcc()
+    {
+        var dummy = new Vector3(0f,0f,1f);
+        Quaternion rotation = Quaternion.Euler(0,10,0);
+        for (int idx = 0; idx < 36; idx++)
         {
-
-
-            // Execute your path here
-            // ...
-
-            Vector3 avg_pos = Vector3.zero;
-
-            foreach (GameObject friend in friends)
-            {
-                avg_pos += friend.transform.position;
-            }
-            avg_pos = avg_pos / friends.Length;
-            //Vector3 direction = (avg_pos - transform.position).normalized;
-            Vector3 direction = (ball.transform.position - transform.position).normalized;
-
-            
-
-            // this is how you access information about the terrain
-            int i = terrain_manager.myInfo.get_i_index(transform.position.x);
-            int j = terrain_manager.myInfo.get_j_index(transform.position.z);
-            float grid_center_x = terrain_manager.myInfo.get_x_pos(i);
-            float grid_center_z = terrain_manager.myInfo.get_z_pos(j);
-
-            Debug.DrawLine(transform.position, ball.transform.position, Color.black);
-            Debug.DrawLine(transform.position, own_goal.transform.position, Color.green);
-            Debug.DrawLine(transform.position, other_goal.transform.position, Color.yellow);
-            Debug.DrawLine(transform.position, friends[0].transform.position, Color.cyan);
-            Debug.DrawLine(transform.position, enemies[0].transform.position, Color.magenta);
-
-
-
-            // this is how you control the car
-            m_Drone.Move_vect(direction);
-            //m_Car.Move(0f, -1f, 1f, 0f);
-
-
+            possibleAcceleration.Add(dummy);
+            dummy = rotation * dummy;
         }
     }
+    private void FixedUpdate(){
+        myPosition =  m_Drone.transform.position;
+        ownGoal = own_goal.transform.position;
+        otherGoal = other_goal.transform.position;
+        ballPosition = ball.transform.position;
+        
+        ballVelocity = ball.GetComponent<Rigidbody>().velocity;
+
+        myPosition.y = 0f;
+        ownGoal.y = 0f;
+        otherGoal.y = 0f;
+        ballPosition.y = 0f;
+        ballVelocity.y = 0f;
+
+        ballPositionPredict = ballPosition + ballVelocity*Time.fixedDeltaTime*20f;
+        Debug.DrawLine(ballPosition, ballPositionPredict, Color.cyan);
+    }
+    
+    private void Update()
+    {
+        //pbTree.Reset();
+        //pbTree.Tick();
+    }
+}
 //}
