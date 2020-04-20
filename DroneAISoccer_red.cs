@@ -26,6 +26,7 @@ public class DroneAISoccer_red : MonoBehaviour
     public int playerNum;
     float time;
     public int counter;
+    private readonly float WORST_SCORE = -1000;
     public Vector3 otherGoal,ownGoal;
     public Vector3 myPosition,ballPosition,ballVelocity, ballPositionPredict;
     public Vector3 defendPoint1, defendPoint2, myDefencePoint;
@@ -50,8 +51,8 @@ public class DroneAISoccer_red : MonoBehaviour
 
         initAcc();
         ball = GameObject.FindGameObjectWithTag("Ball");
-        defendPoint1 = new Vector3(220f, 0f,110f);
-        defendPoint2 = new Vector3(180f, 0f, 90f);
+        defendPoint1 = new Vector3(220f, 0f,100f);
+        defendPoint2 = new Vector3(180f, 0f, 100f);
         for (playerNum = 0; friends[playerNum].transform != m_Drone.transform; playerNum++){}
         myDefencePoint = defendPoint2;
         if (playerNum==1)
@@ -110,7 +111,7 @@ public class DroneAISoccer_red : MonoBehaviour
     [Task]
     public void goBack()
     {
-        goToPosition(myDefencePoint, false, false);
+        goToPosition(myDefencePoint, true, true);
         if (Vector3.Distance(myPosition, myDefencePoint)<4f)
         {
             Task.current.Succeed();
@@ -139,6 +140,7 @@ public class DroneAISoccer_red : MonoBehaviour
                 bestAccScore = score;
             }
         }
+        Debug.DrawRay(myPosition, possibleAcceleration[bestAcc]*10f, Color.green);
         m_Drone.Move_vect(possibleAcceleration[bestAcc]);
     }
     private Vector3 getInterceptAcc()
@@ -146,7 +148,7 @@ public class DroneAISoccer_red : MonoBehaviour
         Vector3 ball2goal = (otherGoal - ballPosition).normalized;
         Vector3 me2ball = (ballPosition - myPosition).normalized;
         int bestIndex= 0;
-        float bestAccScore = -100000;
+        float bestAccScore = WORST_SCORE;
         for (int idx = 0; idx < possibleAcceleration.Count; idx++)
         {
             Vector3 newSpeed = m_Drone.velocity + possibleAcceleration[idx] * time;
@@ -170,13 +172,9 @@ public class DroneAISoccer_red : MonoBehaviour
         {
             for (int idx = 0; idx < enemies.Length; idx++)
             {
-                var friend = enemies[idx];
-                Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
-                Vector3 friendLocation = friend.transform.position - m_Drone.transform.position;
-                if (collisionDetect(newSpeed, friendVelocity, friendLocation))
+                if (collisionDetect(enemies[idx], newSpeed))
                 {
-                    //Debug.Log("avoid enemy");
-                    return 0f;
+                    return WORST_SCORE;
                 }
             }    
             for (int idx = 0; idx < friends.Length; idx++)
@@ -186,30 +184,29 @@ public class DroneAISoccer_red : MonoBehaviour
                 {
                     continue;
                 }
-                Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
-                Vector3 friendLocation = friend.transform.position - m_Drone.transform.position;
-                if (collisionDetect(newSpeed, friendVelocity, friendLocation))
+                if (collisionDetect(friend, newSpeed))
                 {
-                    //Debug.Log("avoid enemy");
-                    return 0f;
+                    return WORST_SCORE;
                 }
             }   
         }
-        if (avoidBall&&collisionDetect(newSpeed, ballVelocity, ballPosition-myPosition))
+        if (avoidBall&&collisionDetect(ball, newSpeed))
         {
-            //Debug.Log("avoid ball");
-            return 0f;
+            return WORST_SCORE;
         }
         return score;
     }
-    private bool collisionDetect(Vector3 mySpeed, Vector3 objectSpeed, Vector3 friendLocation)
+    private bool collisionDetect(GameObject friend, Vector3 mySpeed)
     {
-        Vector3 speedError = mySpeed - objectSpeed;
+        Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
+        Vector3 friendLocation = friend.transform.position - m_Drone.transform.position;
+        Vector3 speedError = mySpeed - friendVelocity;
         if (speedError.magnitude<1f || friendLocation.magnitude>10f)
         {
             return false;
         }
-        if (Vector3.Dot(speedError.normalized, friendLocation.normalized)>0.85)
+        float tolerance = (speedError - Vector3.Project(speedError, friendLocation)).magnitude;
+        if (tolerance<4f)
         {
             return true;
         }
@@ -229,7 +226,7 @@ public class DroneAISoccer_red : MonoBehaviour
         ballPosition.y = 0f;
         ballVelocity.y = 0f;
 
-        ballPositionPredict = ballPosition + ballVelocity*Time.fixedDeltaTime*10f;
+        ballPositionPredict = ballPosition + ballVelocity*Time.fixedDeltaTime*30f;
         Debug.DrawLine(ballPosition, ballPositionPredict, Color.cyan);
     }
     
