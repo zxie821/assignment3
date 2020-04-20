@@ -53,7 +53,7 @@ public class DroneAISoccer_red : MonoBehaviour
         initAcc();
         ball = GameObject.FindGameObjectWithTag("Ball");
         defendPoint1 = new Vector3(225f, 0f,100f);
-        defendPoint2 = new Vector3(180f, 0f, 100f);
+        defendPoint2 = new Vector3(185f, 0f, 100f);
         for (playerNum = 0; friends[playerNum].transform != m_Drone.transform; playerNum++){}
         myDefencePoint = defendPoint2;
         if (playerNum==1)
@@ -72,8 +72,8 @@ public class DroneAISoccer_red : MonoBehaviour
 
         Vector3 idealPosition = ballPositionPredict + goal2ball*6f;
         Debug.DrawLine(myPosition, idealPosition, Color.red);
-        goToPosition(idealPosition, false, false);
-        if ( Vector3.Distance(myPosition, ballPosition)< 7f&&ifGoodShootAngle())
+        goToPosition(idealPosition, true, false);
+        if ( Vector3.Distance(myPosition, ballPosition)< 12f&&ifGoodShootAngle())
         {
             Task.current.Succeed();
         }
@@ -88,16 +88,15 @@ public class DroneAISoccer_red : MonoBehaviour
         {
             Task.current.Succeed();
         }
-        else if(Vector3.Distance(myPosition, ballPosition)>5f||!ifGoodShootAngle())
+        else if(!ifGoodShootAngle())
         {
             Task.current.Fail();
-            pbTree.Reset();
         }
     }
     [Task]
     public bool IsBallNear()
     {
-        return (myDefencePoint.x - ballPositionPredict.x)<40f;
+        return Math.Abs(myDefencePoint.x - ballPositionPredict.x)<40f;
     }
     [Task]
     public void Intercept()
@@ -251,7 +250,7 @@ public class DroneAISoccer_red : MonoBehaviour
     
     private void Update()
     {
-        //pbTree.Reset();
+        pbTree.Reset();
         pbTree.Tick();
     }
 }
