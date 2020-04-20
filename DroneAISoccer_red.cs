@@ -28,6 +28,7 @@ public class DroneAISoccer_red : MonoBehaviour
     public int counter;
     private readonly float WORST_SCORE = -1000;
     public Vector3 otherGoal,ownGoal;
+    public Vector3 otherGoalUp, otherGoalDown;
     public Vector3 myPosition,ballPosition,ballVelocity, ballPositionPredict;
     public Vector3 defendPoint1, defendPoint2, myDefencePoint;
     public List<Vector3> possibleAcceleration;
@@ -51,7 +52,7 @@ public class DroneAISoccer_red : MonoBehaviour
 
         initAcc();
         ball = GameObject.FindGameObjectWithTag("Ball");
-        defendPoint1 = new Vector3(220f, 0f,100f);
+        defendPoint1 = new Vector3(225f, 0f,100f);
         defendPoint2 = new Vector3(180f, 0f, 100f);
         for (playerNum = 0; friends[playerNum].transform != m_Drone.transform; playerNum++){}
         myDefencePoint = defendPoint2;
@@ -67,14 +68,12 @@ public class DroneAISoccer_red : MonoBehaviour
     [Task]
     public void AdjustPosition()
     {
-        Vector3 goal2ball = (ballPositionPredict - otherGoal).normalized;
-        Vector3 me2ball = (ballPositionPredict - myPosition).normalized;
-        Vector3 ball2me = -me2ball;
-        Vector3 ball2goal = -goal2ball;
+        Vector3 goal2ball = (ballPosition - otherGoal).normalized;
 
-        Vector3 idealPosition = ballPositionPredict + goal2ball*4f;
-        goToPosition(idealPosition, true, true);
-        if ( Vector3.Distance(myPosition, idealPosition)< 5f&&Vector3.Dot(ball2me, ball2goal)<-.9f)
+        Vector3 idealPosition = ballPositionPredict + goal2ball*6f;
+        Debug.DrawLine(myPosition, idealPosition, Color.red);
+        goToPosition(idealPosition, false, false);
+        if ( Vector3.Distance(myPosition, ballPosition)< 7f&&ifGoodShootAngle())
         {
             Task.current.Succeed();
         }
@@ -83,12 +82,13 @@ public class DroneAISoccer_red : MonoBehaviour
     [Task]
     public void Shoot()
     {
-        goToPosition(otherGoal, false, false);
+        //goToPosition(otherGoal, false, false);
+        m_Drone.Move_vect(getInterceptAcc());
         if (Vector3.Distance(ballPosition, otherGoal)<3f)
         {
             Task.current.Succeed();
         }
-        else if(Vector3.Distance(myPosition, ballPosition)>5f)
+        else if(Vector3.Distance(myPosition, ballPosition)>5f||!ifGoodShootAngle())
         {
             Task.current.Fail();
             pbTree.Reset();
@@ -97,7 +97,7 @@ public class DroneAISoccer_red : MonoBehaviour
     [Task]
     public bool IsBallNear()
     {
-        return (myDefencePoint.x - ballPositionPredict.x)<20f;
+        return (myDefencePoint.x - ballPositionPredict.x)<40f;
     }
     [Task]
     public void Intercept()
@@ -116,6 +116,21 @@ public class DroneAISoccer_red : MonoBehaviour
         {
             Task.current.Succeed();
         }
+    }
+    private bool ifGoodShootAngle()
+    {
+        Vector3 ball2goalUp = (otherGoalUp - ballPosition).normalized;
+        Vector3 ball2goalDown = (otherGoalDown - ballPosition).normalized;
+        Vector3 me2ball = (ballPosition - myPosition).normalized;
+
+        float cosGoal = Vector3.Dot(ball2goalUp, ball2goalDown);
+        float cosMeUp = Vector3.Dot(me2ball, ball2goalUp);
+        float cosMeDown = Vector3.Dot(me2ball, ball2goalDown);
+        if (cosMeUp>cosGoal && cosMeDown>cosGoal)
+        {
+            return true;
+        }
+        return false;
     }
     private void initAcc()
     {
@@ -201,12 +216,12 @@ public class DroneAISoccer_red : MonoBehaviour
         Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
         Vector3 friendLocation = friend.transform.position - m_Drone.transform.position;
         Vector3 speedError = mySpeed - friendVelocity;
-        if (speedError.magnitude<1f || friendLocation.magnitude>10f)
+        if ( friendLocation.magnitude>5f)
         {
             return false;
         }
         float tolerance = (speedError - Vector3.Project(speedError, friendLocation)).magnitude;
-        if (tolerance<4f)
+        if (tolerance<4f && Vector3.Dot(speedError.normalized, friendLocation.normalized)>0)
         {
             return true;
         }
@@ -225,6 +240,10 @@ public class DroneAISoccer_red : MonoBehaviour
         otherGoal.y = 0f;
         ballPosition.y = 0f;
         ballVelocity.y = 0f;
+        otherGoalUp = otherGoal;
+        otherGoalDown = otherGoal;
+        otherGoalUp.z += 15f;
+        otherGoalDown.z -= 15f;
 
         ballPositionPredict = ballPosition + ballVelocity*Time.fixedDeltaTime*30f;
         Debug.DrawLine(ballPosition, ballPositionPredict, Color.cyan);
