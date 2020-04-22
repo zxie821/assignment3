@@ -1,0 +1,31 @@
+tree("Root")
+    fallback
+        tree("striker")
+        tree("interceptor")
+        tree("goalkeeper")
+
+tree("striker")
+    repeat
+        sequence
+            IsStrikerG12Blue
+            AdjustPositionG12Blue
+            ShootG12Blue
+
+tree("interceptor")
+    repeat
+        fallback
+            sequence
+                IsInterceptorG12Blue
+                fallback
+                    sequence
+                        IsBallNearG12Blue
+                        InterceptG12Blue
+                    goBackG12Blue
+
+tree("goalkeeper")
+    repeat
+        fallback
+            sequence
+                IsGoalKeeperG12Blue
+                BlockG12Blue
+        

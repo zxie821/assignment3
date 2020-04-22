@@ -31,6 +31,7 @@ public class DroneAISoccer_red : MonoBehaviour
     public Vector3 otherGoalUp, otherGoalDown;
     public Vector3 myPosition,ballPosition,ballVelocity, ballPositionPredict;
     public Vector3 defendPoint1, defendPoint2, myDefencePoint;
+    public Vector3 attackDirection;
     public List<Vector3> possibleAcceleration;
     private void Start()
     {
@@ -43,47 +44,57 @@ public class DroneAISoccer_red : MonoBehaviour
         // but for initial planning they should work
         friend_tag = gameObject.tag;
         if (friend_tag == "Blue")
+        {
             enemy_tag = "Red";
+            attackDirection = Vector3.right;
+        }
         else
+        {
             enemy_tag = "Blue";
-
+            attackDirection = Vector3.left;
+        }
         friends = GameObject.FindGameObjectsWithTag(friend_tag);
         enemies = GameObject.FindGameObjectsWithTag(enemy_tag);
 
         initAcc();
         ball = GameObject.FindGameObjectWithTag("Ball");
-        defendPoint1 = new Vector3(225f, 0f,100f);
-        defendPoint2 = new Vector3(185f, 0f, 100f);
+        myDefencePoint = new Vector3(185f, 0f,100f);
         for (playerNum = 0; friends[playerNum].transform != m_Drone.transform; playerNum++){}
-        myDefencePoint = defendPoint2;
-        if (playerNum==1)
-        {
-            myDefencePoint = defendPoint1;
-        }
         time = Time.fixedDeltaTime * 50f;
         //FixedUpdate();
     }
     [Task]
-    public bool IsStriker(){return playerNum==0;}
+    public bool IsStrikerG12(){return playerNum==2;}
     [Task]
-    public void AdjustPosition()
+    public bool IsInterceptorG12(){return playerNum==1;}
+    [Task]
+    public bool IsGoalKeeperG12(){return playerNum==0;}
+    
+    [Task]
+    public void AdjustPositionG12()
     {
+        
         Vector3 goal2ball = (ballPosition - otherGoal).normalized;
+        var goal2ballUp = (ballPosition - otherGoalUp).normalized;
+        var goal2ballDown = (ballPosition - otherGoalDown).normalized;
 
-        Vector3 idealPosition = ballPositionPredict + goal2ball*6f;
+        Vector3 idealPosition = ballPosition + goal2ball * 10f;
+        Debug.DrawRay(otherGoalUp, goal2ballUp*1000f, Color.black);
+        Debug.DrawRay(otherGoalDown, goal2ballDown*1000f, Color.black);
         Debug.DrawLine(myPosition, idealPosition, Color.red);
-        goToPosition(idealPosition, true, false);
-        if ( Vector3.Distance(myPosition, ballPosition)< 12f&&ifGoodShootAngle())
+        goToPosition(idealPosition, true, true);
+
+        if (ifGoodShootAngle())
         {
             Task.current.Succeed();
         }
     }
 
     [Task]
-    public void Shoot()
+    public void ShootG12()
     {
         //goToPosition(otherGoal, false, false);
-        m_Drone.Move_vect(getInterceptAcc());
+        m_Drone.Move_vect(getInterceptAcc(ballPosition));
         if (Vector3.Distance(ballPosition, otherGoal)<3f)
         {
             Task.current.Succeed();
@@ -91,31 +102,84 @@ public class DroneAISoccer_red : MonoBehaviour
         else if(!ifGoodShootAngle())
         {
             Task.current.Fail();
+            pbTree.Reset();
         }
     }
     [Task]
-    public bool IsBallNear()
+    public bool IsBallNearG12()
     {
         return Math.Abs(myDefencePoint.x - ballPositionPredict.x)<40f;
     }
     [Task]
-    public void Intercept()
+    public void InterceptG12()
     {
-        m_Drone.Move_vect(getInterceptAcc());
-        if (!IsBallNear())
+        Vector3 me2ball = (ballPositionPredict - myPosition).normalized;
+        if (Vector3.Angle(me2ball, attackDirection)<90)
+        {
+            m_Drone.Move_vect(getInterceptAcc(ballPosition));
+
+        }
+        else
+        {
+            Vector3 closestEnemy = Vector3.zero;
+            float distanceMin = 10000000;
+            for (int idx = 0; idx< enemies.Length; idx++)
+            {
+                Vector3 enemyPosition = enemies[idx].transform.position;
+                enemyPosition.y = 0;
+                float enemy2ballDis = (ballPosition- enemyPosition).magnitude;
+                if (enemy2ballDis<distanceMin)
+                {
+                    closestEnemy = enemyPosition;
+                    distanceMin = enemy2ballDis;
+                }
+            }
+            m_Drone.Move_vect(getInterceptAcc(closestEnemy));
+        }
+        if (!IsBallNearG12())
         {
             Task.current.Succeed();
         }
+
     }
     [Task]
-    public void goBack()
+    public void goBackG12()
     {
-        goToPosition(myDefencePoint, true, true);
+        goToPosition(myDefencePoint, true, false, false);
         if (Vector3.Distance(myPosition, myDefencePoint)<4f)
         {
             Task.current.Succeed();
+        }else if(IsBallNearG12())
+        {
+            Task.current.Fail();
+            pbTree.Reset();
         }
     }
+    [Task]
+    public void BlockG12()
+    {
+        if (Vector3.Distance(ballPositionPredict, ownGoal)<35f)
+        {
+            m_Drone.Move_vect(getInterceptAcc(ballPosition));
+        }
+        else
+        {
+            Vector3 defendPoint = new Vector3(0f,0f,0f);
+            defendPoint.x = (ownGoal+attackDirection*3f).x;
+            defendPoint.z = ballPositionPredict.z;
+            if (defendPoint.z>ownGoal.z+16f)
+            {
+                defendPoint.z = ownGoal.z+16f;
+            }
+            else if(defendPoint.z < ownGoal.z-16f)
+            {
+                defendPoint.z = ownGoal.z -16f;
+            }
+            goToPosition(defendPoint,false, false, false);
+        }
+
+    }
+
     private bool ifGoodShootAngle()
     {
         Vector3 ball2goalUp = (otherGoalUp - ballPosition).normalized;
@@ -125,7 +189,7 @@ public class DroneAISoccer_red : MonoBehaviour
         float cosGoal = Vector3.Dot(ball2goalUp, ball2goalDown);
         float cosMeUp = Vector3.Dot(me2ball, ball2goalUp);
         float cosMeDown = Vector3.Dot(me2ball, ball2goalDown);
-        if (cosMeUp>cosGoal && cosMeDown>cosGoal)
+        if (cosMeUp>cosGoal && cosMeDown>cosGoal && ball.transform.position.y<7f)
         {
             return true;
         }
@@ -141,13 +205,13 @@ public class DroneAISoccer_red : MonoBehaviour
             dummy = rotation * dummy;
         }
     }
-    private void goToPosition(Vector3 target, bool avoidBall, bool avoidAgents)
+    private void goToPosition(Vector3 target, bool avoidBall, bool avoidAgents, bool speedFirst=true)
     {
         int bestAcc = -1;
         float bestAccScore = -100000;
         for (int i = 0; i < possibleAcceleration.Count; i++)
         {
-            float score = evaluateAcceleration(target, possibleAcceleration[i], avoidBall, avoidAgents);
+            float score = evaluateAcceleration(target, possibleAcceleration[i], avoidBall, avoidAgents, speedFirst);
             if (score>bestAccScore)
             {
                 bestAcc = i;
@@ -157,40 +221,45 @@ public class DroneAISoccer_red : MonoBehaviour
         Debug.DrawRay(myPosition, possibleAcceleration[bestAcc]*10f, Color.green);
         m_Drone.Move_vect(possibleAcceleration[bestAcc]);
     }
-    private Vector3 getInterceptAcc()
+    private Vector3 getInterceptAcc(Vector3 target)
     {
-        Vector3 ball2goal = (otherGoal - ballPosition).normalized;
-        Vector3 me2ball = (ballPosition - myPosition).normalized;
+        Vector3 me2target = (target - myPosition).normalized;
         int bestIndex= 0;
-        float bestAccScore = WORST_SCORE;
+        float bestAccAngle = 360f;
         for (int idx = 0; idx < possibleAcceleration.Count; idx++)
         {
-            Vector3 newSpeed = m_Drone.velocity + possibleAcceleration[idx] * time;
+            Vector3 newSpeed = m_Drone.velocity + possibleAcceleration[idx] * time*10;
             var speedError = newSpeed - ballVelocity;
-            float score = Vector3.Dot(speedError.normalized, me2ball.normalized);
-            if (score>bestAccScore)
+            float angle = Vector3.Angle(speedError.normalized, me2target.normalized);
+            //float speed = Vector3.Project()
+            if (angle<bestAccAngle)
             {
                 bestIndex = idx;
-                bestAccScore = score;
+                bestAccAngle = angle;
             }
         }
         return possibleAcceleration[bestIndex];
     }
 
-    private float evaluateAcceleration(Vector3 target, Vector3 acceleration, bool avoidBall, bool avoidAgents)
+    private float evaluateAcceleration(Vector3 target, Vector3 acceleration, bool avoidBall, bool avoidAgents, bool speedFirst=true)
     {
-        Vector3 estimatedDestination = m_Drone.velocity*time + 0.5f*acceleration*time*time + myPosition;
-        Vector3 newSpeed = m_Drone.velocity + acceleration * time;
-        float score = 10000f - Vector3.Distance(target, estimatedDestination);
+        float score;
+        Vector3 newSpeed;
+        if (speedFirst)
+        {
+            Vector3 me2target = (target - myPosition).normalized;
+            newSpeed = m_Drone.velocity + acceleration * time*10;
+            score = 360f - Vector3.Angle(newSpeed, me2target.normalized);
+        }
+        else
+        {
+            Vector3 estimatedDestination = m_Drone.velocity*time + 0.5f*acceleration*time*time + myPosition;
+            newSpeed = m_Drone.velocity + acceleration * time;
+            score = 10000f - Vector3.Distance(target, estimatedDestination);
+        }
+        
         if (avoidAgents)
         {
-            for (int idx = 0; idx < enemies.Length; idx++)
-            {
-                if (collisionDetect(enemies[idx], newSpeed))
-                {
-                    return WORST_SCORE;
-                }
-            }    
             for (int idx = 0; idx < friends.Length; idx++)
             {
                 var friend = friends[idx];
@@ -213,16 +282,18 @@ public class DroneAISoccer_red : MonoBehaviour
     private bool collisionDetect(GameObject friend, Vector3 mySpeed)
     {
         Vector3 friendVelocity = friend.GetComponent<Rigidbody>().velocity;
-        Vector3 friendLocation = friend.transform.position - m_Drone.transform.position;
+        Vector3 friendPosition = friend.transform.position;
+        friendPosition.y = 0f;
+        Vector3 friendLocation = friendPosition- myPosition;
         Vector3 speedError = mySpeed - friendVelocity;
-        if ( friendLocation.magnitude>5f)
+        //float tolerance = (speedError - Vector3.Project(speedError, friendLocation)).magnitude;
+        if (Vector3.Angle(speedError.normalized, friendLocation.normalized)<5f)
         {
-            return false;
-        }
-        float tolerance = (speedError - Vector3.Project(speedError, friendLocation)).magnitude;
-        if (tolerance<4f && Vector3.Dot(speedError.normalized, friendLocation.normalized)>0)
-        {
-            return true;
+            float timeToHit = Vector3.Project(speedError, friendLocation).magnitude / mySpeed.magnitude;
+            if (timeToHit<5f)
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -241,8 +312,16 @@ public class DroneAISoccer_red : MonoBehaviour
         ballVelocity.y = 0f;
         otherGoalUp = otherGoal;
         otherGoalDown = otherGoal;
-        otherGoalUp.z += 15f;
-        otherGoalDown.z -= 15f;
+        if (Math.Abs(otherGoal.x-ballPosition.x)<50f)
+        {
+            otherGoalUp.z += 15f;
+            otherGoalDown.z -= 15f;
+        }
+        else
+        {
+            otherGoalUp.z += 50f;
+            otherGoalDown.z -= 50f;
+        }
 
         ballPositionPredict = ballPosition + ballVelocity*Time.fixedDeltaTime*30f;
         Debug.DrawLine(ballPosition, ballPositionPredict, Color.cyan);
@@ -250,7 +329,7 @@ public class DroneAISoccer_red : MonoBehaviour
     
     private void Update()
     {
-        pbTree.Reset();
+        //pbTree.Reset();
         pbTree.Tick();
     }
 }
